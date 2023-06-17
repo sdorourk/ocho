@@ -1,17 +1,22 @@
 use crate::Instruction::*;
 use crate::{framebuffer::Framebuffer, instruction::Instruction};
 
+/// Memory size in bytes
 pub const MEMORY_SIZE: usize = 4096;
+/// Program start address
 pub const PROGRAM_START: usize = 0x200;
-
+/// Display height in pixels
 pub const DISPLAY_HEIGHT: usize = 32;
+/// Display width in pixels
 pub const DISPLAY_WIDTH: usize = 64;
-
-pub const STACK_SIZE: usize = 16;
-
-pub const NUMBER_OF_REGISTERS: usize = 16;
-
-pub const FONT_DATA: [u8; 5 * 16] = [
+/// Stack size
+const STACK_SIZE: usize = 16;
+/// Number of 8-bit general purpose registers
+const NUMBER_OF_REGISTERS: usize = 16;
+/// Number of keys on the keypad
+pub const KEYPAD_SIZE: usize = 16;
+/// Default fonts
+const FONT_DATA: [u8; 5 * 16] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
     0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
@@ -51,6 +56,8 @@ pub struct Chip8 {
     stack: [usize; STACK_SIZE],
     /// Stack pointer
     sp: usize,
+    /// Keypad
+    pub keypad: [bool; KEYPAD_SIZE],
 }
 
 impl Chip8 {
@@ -71,6 +78,7 @@ impl Chip8 {
             st: 0,
             stack: [0; STACK_SIZE],
             sp: 0,
+            keypad: [false; KEYPAD_SIZE],
         }
     }
 
@@ -94,56 +102,153 @@ impl Chip8 {
         self.pc += 2;
 
         match instr {
-            Sys(_) => {},
+            Sys(_) => {}
             Cls => {
                 self.fb.clear();
-            },
-            Ret => todo!(),
+            }
+            Ret => {
+                assert_ne!(self.sp, 0, "Stack underflow");
+                self.sp -= 1;
+                self.pc = self.stack[self.sp] + 2;
+            }
             Jmp(nnn) => {
                 self.pc = nnn;
-            },
-            Call(_) => todo!(),
-            Skeb(_, _) => todo!(),
-            Skneb(_, _) => todo!(),
-            Ske(_, _) => todo!(),
+            }
+            Call(nnn) => {
+                assert_ne!(self.sp, STACK_SIZE, "Stack overflow");
+                self.stack[self.sp] = self.pc - 2;
+                self.sp += 1;
+                self.pc = nnn;
+            }
+            Skeb(x, nn) => {
+                if self.v[x] == nn {
+                    self.pc += 2;
+                }
+            }
+            Skneb(x, nn) => {
+                if self.v[x] != nn {
+                    self.pc += 2;
+                }
+            }
+            Ske(x, y) => {
+                if self.v[x] == self.v[y] {
+                    self.pc += 2;
+                }
+            }
             Ldb(x, nn) => {
                 self.v[x] = nn;
-            },
-            Addb(_, _) => todo!(),
-            Ld(_, _) => todo!(),
-            Or(_, _) => todo!(),
-            And(_, _) => todo!(),
-            Xor(_, _) => todo!(),
-            Add(_, _) => todo!(),
-            Sub(_, _) => todo!(),
-            Shr(_, _) => todo!(),
-            Subr(_, _) => todo!(),
-            Shl(_, _) => todo!(),
-            Skne(_, _) => todo!(),
-            Ldi(nnn) => {
-                self.i = nnn;
-            },
-            Jmpz(_) => todo!(),
-            Rnd(_, _) => todo!(),
-            Draw(x, y, n) => {
-                if self.fb.draw(self.v[x], self.v[y], n, &self.mem[self.i..self.i+usize::from(n)], false) {
+            }
+            Addb(x, nn) => {
+                self.v[x] = self.v[x].wrapping_add(nn);
+            }
+            Ld(x, y) => {
+                self.v[x] = self.v[y];
+            }
+            Or(x, y) => {
+                self.v[x] |= self.v[y];
+            }
+            And(x, y) => {
+                self.v[x] &= self.v[y];
+            }
+            Xor(x, y) => {
+                self.v[x] ^= self.v[y];
+            }
+            Add(x, y) => {
+                let (value, overflow) = self.v[x].overflowing_add(self.v[y]);
+                self.v[x] = value;
+                if overflow {
                     self.v[0xF] = 1;
                 } else {
                     self.v[0xF] = 0;
                 }
-            },
+            }
+            Sub(x, y) => {
+                let (value, overflow) = self.v[x].overflowing_sub(self.v[y]);
+                self.v[x] = value;
+                if overflow {
+                    self.v[0xF] = 0;
+                } else {
+                    self.v[0xF] = 1;
+                }
+            }
+            Shr(x, _) => {
+                self.v[0xF] = self.v[x] & 0x1;
+                self.v[x] >>= 1;
+            }
+            Subr(x, y) => {
+                let (value, overflow) = self.v[y].overflowing_sub(self.v[x]);
+                self.v[x] = value;
+                if overflow {
+                    self.v[0xF] = 0;
+                } else {
+                    self.v[0xF] = 1;
+                }
+            }
+            Shl(x, _) => {
+                self.v[0xF] = (self.v[x] & 0b1000_0000) >> 7;
+                self.v[x] <<= 1;
+            }
+            Skne(x, y) => {
+                if self.v[x] != self.v[y] {
+                    self.pc += 2;
+                }
+            }
+            Ldi(nnn) => {
+                self.i = nnn;
+            }
+            Jmpz(_) => todo!(),
+            Rnd(_, _) => todo!(),
+            Draw(x, y, n) => {
+                if self.fb.draw(
+                    self.v[x],
+                    self.v[y],
+                    n,
+                    &self.mem[self.i..self.i + usize::from(n)],
+                    false,
+                ) {
+                    self.v[0xF] = 1;
+                } else {
+                    self.v[0xF] = 0;
+                }
+            }
             Skp(_) => todo!(),
             Sknp(_) => todo!(),
             Ldft(_) => todo!(),
             Ldk(_) => todo!(),
             Lddt(_) => todo!(),
             Ldst(_) => todo!(),
-            Addi(_) => todo!(),
+            Addi(x) => {
+                self.i += usize::from(self.v[x]);
+            }
             Font(_) => todo!(),
-            Bcd(_) => todo!(),
-            Sreg(_) => todo!(),
-            Lreg(_) => todo!(),
-            Err(_) => {},
+            Bcd(x) => {
+                assert!(
+                    self.i + 2 < MEMORY_SIZE,
+                    "Attempted to write outside of memory bounds"
+                );
+                self.mem[self.i] = self.v[x] / 100;
+                self.mem[self.i + 1] = (self.v[x] / 10) % 10;
+                self.mem[self.i + 2] = self.v[x] % 10;
+            }
+            Sreg(x) => {
+                assert!(
+                    self.i + x < MEMORY_SIZE,
+                    "Attempted to write outside of memory bounds"
+                );
+                for offset in 0..=x {
+                    self.mem[self.i + offset] = self.v[offset];
+                }
+            }
+            Lreg(x) => {
+                assert!(
+                    self.i + x < MEMORY_SIZE,
+                    "Attempted to read outside of memory bounds"
+                );
+                for offset in 0..=x {
+                    self.v[offset] = self.mem[self.i + offset];
+                }
+            }
+            Err(_) => {}
         }
     }
 }
