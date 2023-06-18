@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::Instruction::*;
 use crate::{framebuffer::Framebuffer, instruction::Instruction};
 
@@ -15,8 +17,12 @@ const STACK_SIZE: usize = 16;
 const NUMBER_OF_REGISTERS: usize = 16;
 /// Number of keys on the keypad
 pub const KEYPAD_SIZE: usize = 16;
-/// Default fonts
-const FONT_DATA: [u8; 5 * 16] = [
+/// Number of glyphs in the default font
+const GLYPH_COUNT: usize = 16;
+/// Size (in bytes) of the glyphs in the default font
+const GLYPH_SIZE: usize = 5;
+/// Default font
+const FONT_DATA: [u8; GLYPH_SIZE * GLYPH_COUNT] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
     0x20, 0x60, 0x20, 0x20, 0x70, // 1
     0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
@@ -92,7 +98,7 @@ impl Chip8 {
     fn fetch(&self) -> u16 {
         assert!(
             self.pc + 1 < MEMORY_SIZE,
-            "Program counter has exceeded memory size"
+            "Attempted to read outside of memory bounds"
         );
         u16::from_be_bytes([self.mem[self.pc], self.mem[self.pc + 1]])
     }
@@ -196,8 +202,12 @@ impl Chip8 {
             Ldi(nnn) => {
                 self.i = nnn;
             }
-            Jmpz(_) => todo!(),
-            Rnd(_, _) => todo!(),
+            Jmpz(nnn) => {
+                self.pc = nnn + usize::from(self.v[0]);
+            }
+            Rnd(x, nn) => {
+                self.v[x] = rand::thread_rng().gen::<u8>() & nn;
+            }
             Draw(x, y, n) => {
                 if self.fb.draw(
                     self.v[x],
@@ -211,16 +221,60 @@ impl Chip8 {
                     self.v[0xF] = 0;
                 }
             }
-            Skp(_) => todo!(),
-            Sknp(_) => todo!(),
-            Ldft(_) => todo!(),
-            Ldk(_) => todo!(),
-            Lddt(_) => todo!(),
-            Ldst(_) => todo!(),
+            Skp(x) => {
+                let key = usize::from(self.v[x]);
+                assert!(key < KEYPAD_SIZE, "{:#X} is not a valid key", key);
+                if self.keypad[key] {
+                    self.pc += 2;
+                }
+            }
+            Sknp(x) => {
+                let key = usize::from(self.v[x]);
+                assert!(key < KEYPAD_SIZE, "{:#X} is not a valid key", key);
+                if !self.keypad[key] {
+                    self.pc += 2;
+                }
+            }
+            Ldft(x) => {
+                self.v[x] = self.dt;
+            }
+            Ldk(x) => {
+                let pressed_keys: Vec<u8> = self
+                    .keypad
+                    .into_iter()
+                    .enumerate()
+                    .filter_map(|(i, val)| {
+                        if val {
+                            Some(u8::try_from(i).unwrap())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if pressed_keys.is_empty() {
+                    self.pc -= 2;
+                } else {
+                    self.v[x] = pressed_keys[0];
+                }
+            }
+            Lddt(x) => {
+                self.dt = self.v[x];
+            }
+            Ldst(x) => {
+                self.st = self.v[x];
+            }
             Addi(x) => {
                 self.i += usize::from(self.v[x]);
             }
-            Font(_) => todo!(),
+            Font(x) => {
+                let digit = usize::from(self.v[x]);
+                assert!(
+                    digit < GLYPH_COUNT,
+                    "{:#X} is not a valid glyph in the default font",
+                    digit
+                );
+                self.i = GLYPH_SIZE * digit;
+            }
             Bcd(x) => {
                 assert!(
                     self.i + 2 < MEMORY_SIZE,

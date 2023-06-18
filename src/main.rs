@@ -36,7 +36,7 @@ fn main() {
         }
     };
 
-    if rom.len() == 0 {
+    if rom.is_empty() {
         eprintln!(
             "The file \'{}\' is not a valid CHIP-8 program",
             args.program.display()
