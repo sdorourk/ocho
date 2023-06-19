@@ -6,11 +6,13 @@
 ///  - Check for errors and test
 /////////////////////////////////////////////////////////
 mod chip8;
+mod emulator;
 mod framebuffer;
 mod instruction;
 
 use chip8::{Chip8, MEMORY_SIZE, PROGRAM_START};
 use clap::Parser;
+use emulator::Emulator;
 use instruction::Instruction;
 use std::{fs::read, path::PathBuf};
 
@@ -51,12 +53,8 @@ fn main() {
     }
     disassemble(&rom);
 
-    let mut chip = Chip8::new(&rom);
-    loop {
-        chip.step();
-        interactive_debugger();
-        print_display(&chip);
-    }
+    let mut emu = Emulator::new(&rom).unwrap();
+    emu.run();
 }
 
 fn disassemble(rom: &[u8]) {

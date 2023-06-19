@@ -67,14 +67,16 @@ pub struct Chip8 {
 }
 
 impl Chip8 {
-    pub fn new(rom: &[u8]) -> Self {
-        assert!(rom.len() < MEMORY_SIZE - PROGRAM_START);
-
+    pub fn new(rom: &[u8]) -> Result<Self, String> {
+        if rom.len() >= MEMORY_SIZE - PROGRAM_START {
+            return Result::Err("Program is too large to hold in CHIP-8 memory".into());
+        } 
+        
         let mut mem: [u8; MEMORY_SIZE] = [0; MEMORY_SIZE];
         mem[0..FONT_DATA.len()].copy_from_slice(&FONT_DATA);
         mem[PROGRAM_START..PROGRAM_START + rom.len()].copy_from_slice(rom);
 
-        Self {
+        Ok(Self {
             mem,
             fb: Framebuffer::new(),
             v: [0; NUMBER_OF_REGISTERS],
@@ -85,7 +87,7 @@ impl Chip8 {
             stack: [0; STACK_SIZE],
             sp: 0,
             keypad: [false; KEYPAD_SIZE],
-        }
+        })
     }
 
     pub fn step(&mut self) {
