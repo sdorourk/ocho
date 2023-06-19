@@ -70,8 +70,8 @@ impl Chip8 {
     pub fn new(rom: &[u8]) -> Result<Self, String> {
         if rom.len() >= MEMORY_SIZE - PROGRAM_START {
             return Result::Err("Program is too large to hold in CHIP-8 memory".into());
-        } 
-        
+        }
+
         let mut mem: [u8; MEMORY_SIZE] = [0; MEMORY_SIZE];
         mem[0..FONT_DATA.len()].copy_from_slice(&FONT_DATA);
         mem[PROGRAM_START..PROGRAM_START + rom.len()].copy_from_slice(rom);
