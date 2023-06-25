@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use sdl2::{
     audio::{AudioCallback, AudioSpecDesired},
     event::Event,
@@ -9,13 +11,32 @@ use crate::chip8::{Chip8, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 pub struct Emulator {
     chip: Chip8,
+    options: Options,
+}
+
+#[derive(Debug)]
+pub struct Options {
+    // Frames per second
+    pub fps: u16,
+    /// Instructions executed per frame
+    pub ipf: u16,
+    /// Display scale factor
+    pub scale: u32,
+    /// Foreground color (ARGB8888)
+    pub fg: u32,
+    /// Background color (ARGB8888)
+    pub bg: u32,
+    /// Pitch of the buzzer (in Hz)
+    pub pitch: u16,
+    /// Limit only one draw operation per frame
+    pub display_wait: bool,
 }
 
 impl Emulator {
-    pub fn new(rom: &[u8]) -> Result<Self, String> {
+    pub fn new(rom: &[u8], options: Options) -> Result<Self, String> {
         let chip = Chip8::new(rom)?;
 
-        Ok(Self { chip })
+        Ok(Self { chip, options })
     }
 
     pub fn run(&mut self) -> Result<(), String> {
@@ -29,7 +50,7 @@ impl Emulator {
 
         // Initialize the window
         let window = video_subsystem
-            .window("CHIP-8 Emulator", width * 10, height * 10)
+            .window("CHIP-8 Emulator", width * self.options.scale, height * self.options.scale)
             .position_centered()
             .resizable()
             .build()
@@ -41,7 +62,7 @@ impl Emulator {
             .set_logical_size(width, height)
             .map_err(|e| e.to_string())?;
         let mut texture = texture_creator
-            .create_texture_streaming(PixelFormatEnum::ARGB8888, width, height)
+            .create_texture_streaming(PixelFormatEnum::RGBA32, width, height)
             .map_err(|e| e.to_string())?;
 
         // Initialize the audio
@@ -59,40 +80,51 @@ impl Emulator {
 
         // Create the event pump
         let mut event_pump = sdl_context.event_pump()?;
-
+        let nano_seconds_per_frame: u128 = 1_000_000_000 / u128::from(self.options.fps);
+        
         'running: loop {
-            for event in event_pump.poll_iter() {
-                match event {
-                    Event::Quit { .. }
-                    | Event::KeyDown {
-                        keycode: Some(Keycode::Escape),
-                        ..
-                    } => break 'running,
-                    _ => {}
+            let start = Instant::now();
+            for _ in 0..self.options.ipf {
+                for event in event_pump.poll_iter() {
+                    match event {
+                        Event::Quit { .. }
+                        | Event::KeyDown {
+                            keycode: Some(Keycode::Escape),
+                            ..
+                        } => break 'running,
+                        _ => {}
+                    }
                 }
-            }
-            self.chip.step();
+                self.chip.step();
 
-            if self.chip.st > 0 {
-                audio_device.resume();
-            } else {
-                audio_device.pause();
-            }
-            if self.chip.fb.updated {
-                let pixels = self
-                    .chip
-                    .fb
-                    .to_color_model(&[0xFF, 0xFF, 0xFF, 0xFF], &[0, 0, 0, 0]);
-                texture.with_lock(None, |buffer: &mut [u8], _: usize| {
-                    buffer.copy_from_slice(&pixels);
-                })?;
-                self.chip.fb.updated = false;
+                if self.chip.st > 0 {
+                    audio_device.resume();
+                } else {
+                    audio_device.pause();
+                }
+                if self.chip.fb.updated {
+                    let pixels = self
+                        .chip
+                        .fb
+                        .to_color_model(&[0xFF, 0xFF, 0xFF, 0xFF], &[0, 0, 0, 0]);
+                    texture.with_lock(None, |buffer: &mut [u8], _: usize| {
+                        buffer.copy_from_slice(&pixels);
+                    })?;
+                    self.chip.fb.updated = false;
+                    if self.options.display_wait {
+                        break;
+                    }
+                }
             }
             canvas.clear();
             canvas.copy(&texture, None, None)?;
             canvas.present();
 
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            let elapsed_nano_seconds = start.elapsed().as_nanos();
+            if elapsed_nano_seconds < nano_seconds_per_frame {
+                let sleep_duration = u64::try_from(nano_seconds_per_frame - elapsed_nano_seconds).unwrap_or(0);
+                std::thread::sleep(std::time::Duration::from_nanos(sleep_duration));
+            }
         }
         Ok(())
     }
