@@ -1,8 +1,8 @@
 /////////////////////////////////////////////////////////
 /// Todo:
-///  - Add quirks.
-///  - Add options
-///  - Implement SDL
+///  - Add quirks
+///  - Keypad support
+///  - Document
 ///  - Check for errors and test
 /////////////////////////////////////////////////////////
 mod chip8;
@@ -10,8 +10,8 @@ mod emulator;
 mod framebuffer;
 mod instruction;
 
-use chip8::{Chip8, MEMORY_SIZE, PROGRAM_START};
-use clap::{Parser, value_parser};
+use chip8::PROGRAM_START;
+use clap::{value_parser, Parser};
 use emulator::{Emulator, Options};
 use instruction::Instruction;
 use std::{fs::read, path::PathBuf};
@@ -21,7 +21,11 @@ use std::{fs::read, path::PathBuf};
 struct Cli {
     /// Path to the binary CHIP-8 program to run
     program: PathBuf,
-    /// Target frames per second 
+    /// Display the disassembled binary CHIP-8 program to standard output before running it.  
+    /// This is useful for debugging.
+    #[arg(long)]
+    disasm: bool,
+    /// Target frames per second
     #[arg(short, long, default_value_t = 60, value_parser = value_parser!(u16).range(1..))]
     fps: u16,
     /// Target instructions per frame
@@ -30,11 +34,17 @@ struct Cli {
     /// Window scale factor
     #[arg(short, long, default_value_t = 10, value_parser = value_parser!(u32).range(1..))]
     scale: u32,
+    /// Foreground color in RGBA8888 format (e.g., #FF0A2B1D or 0xFF0A2B1D)
+    #[arg(short, long, default_value_t = String::from("0xFFFFFFFF"), value_parser=verify_color)]
+    color: String,
+    /// Background color in RGBA8888 format (e.g., #FF0A2B1D or 0xFF0A2B1D)
+    #[arg(short, long, default_value_t = String::from("0x000000"), value_parser=verify_color)]
+    background: String,
     /// Pitch of the buzzer (in Hz)
-    #[arg(short, long, default_value_t = 440, value_parser = value_parser!(u16).range(1..))]
+    #[arg(short, long, default_value_t = 440, value_parser = value_parser!(u16).range(20..=10_000))]
     pitch: u16,
     /// Limit only one draw operation per frame
-    #[arg(short, long)] 
+    #[arg(short, long)]
     display_wait: bool,
 }
 
@@ -45,7 +55,7 @@ fn main() {
         Ok(rom) => rom,
         Err(err) => {
             eprintln!(
-                "The file \'{}\' could not be opened: {}",
+                "\'{}\': file could not be opened: {}",
                 cli.program.display(),
                 err
             );
@@ -55,31 +65,44 @@ fn main() {
 
     if rom.is_empty() {
         eprintln!(
-            "The file \'{}\' is not a valid CHIP-8 program",
-            cli.program.display()
-        );
-        return;
-    } else if rom.len() > MEMORY_SIZE - PROGRAM_START {
-        eprintln!(
-            "The file \'{}\' is too large to fit in memory",
+            "\'{}\': not a valid CHIP-8 program: file is empty",
             cli.program.display()
         );
         return;
     }
-    disassemble(&rom);
+
+    if cli.disasm {
+        disassemble(&rom);
+    }
+
+    // Clap has already checked that `parse_color` will not return `Err` for these values,
+    // so it is safe to unwrap; there is no possibility of panicking.
+    let fg = parse_color(&cli.color).unwrap();
+    let bg = parse_color(&cli.background).unwrap();
 
     let options = Options {
         fps: cli.fps,
         ipf: cli.ipf,
         scale: cli.scale,
-        fg: 0xffffff,
-        bg: 0,
+        fg,
+        bg,
         pitch: cli.pitch,
         display_wait: cli.display_wait,
-    }; 
-
-    let mut emu = Emulator::new(&rom, options).unwrap();
-    emu.run();
+    };
+    let mut emu = match Emulator::new(&rom, options) {
+        Ok(emu) => emu,
+        Err(e) => {
+            eprintln!(
+                "\'{}\': not a valid CHIP-8 program: {}",
+                cli.program.display(),
+                e
+            );
+            return;
+        }
+    };
+    if let Err(e) = emu.run() {
+        eprintln!("an unexpected error occurred: {}", e);
+    }
 }
 
 fn disassemble(rom: &[u8]) {
@@ -100,21 +123,23 @@ fn disassemble(rom: &[u8]) {
     }
 }
 
-fn interactive_debugger() {
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
+/// Verifies if the function `parse_color` will succeed
+fn verify_color(s: &str) -> Result<String, String> {
+    parse_color(s)?;
+    Ok(String::from(s))
 }
 
-fn print_display(chip: &Chip8) {
-    let disp = chip.fb.to_color_model(&[true], &[false]);
-    for y in 0..chip8::DISPLAY_HEIGHT {
-        for x in 0..chip8::DISPLAY_WIDTH {
-            if disp[y * chip8::DISPLAY_WIDTH + x] {
-                print!("X");
-            } else {
-                print!(" ");
-            }
-        }
-        println!("");
+/// Parses input as RGBA8888 (hex) format.  Both "#" and "0x" are allowed as optional
+/// prefixes. If parsing as a base 16 value fails, also tries base 10.  Returns `Err`
+/// if both parsing attempts fail.
+fn parse_color(s: &str) -> Result<u32, String> {
+    let stripped = s.strip_prefix('#').unwrap_or(s);
+    let stripped = s.strip_prefix("0x").unwrap_or(stripped);
+
+    match u32::from_str_radix(stripped, 16) {
+        Ok(value) => Ok(value),
+        Err(_) => stripped
+            .parse()
+            .map_err(|_| format!("{} is not a valid color in RGBA8888 format", s)),
     }
 }

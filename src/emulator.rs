@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use sdl2::{
     audio::{AudioCallback, AudioSpecDesired},
@@ -22,9 +22,9 @@ pub struct Options {
     pub ipf: u16,
     /// Display scale factor
     pub scale: u32,
-    /// Foreground color (ARGB8888)
+    /// Foreground color (RBGA8888)
     pub fg: u32,
-    /// Background color (ARGB8888)
+    /// Background color (RGBA8888)
     pub bg: u32,
     /// Pitch of the buzzer (in Hz)
     pub pitch: u16,
@@ -35,7 +35,6 @@ pub struct Options {
 impl Emulator {
     pub fn new(rom: &[u8], options: Options) -> Result<Self, String> {
         let chip = Chip8::new(rom)?;
-
         Ok(Self { chip, options })
     }
 
@@ -44,13 +43,17 @@ impl Emulator {
         let video_subsystem = sdl_context.video()?;
         let audio_subsystem = sdl_context.audio()?;
 
-        // We need the height and width as u32
-        let height = u32::try_from(DISPLAY_HEIGHT).unwrap();
-        let width = u32::try_from(DISPLAY_WIDTH).unwrap();
+        // Required to avoid excessive conversions
+        let height = DISPLAY_HEIGHT as u32;
+        let width = DISPLAY_WIDTH as u32;
 
         // Initialize the window
         let window = video_subsystem
-            .window("CHIP-8 Emulator", width * self.options.scale, height * self.options.scale)
+            .window(
+                "CHIP-8 Emulator",
+                width * self.options.scale,
+                height * self.options.scale,
+            )
             .position_centered()
             .resizable()
             .build()
@@ -71,17 +74,29 @@ impl Emulator {
             channels: Some(1),
             samples: None,
         };
-        let audio_device =
-            audio_subsystem.open_playback(None, &desired_audio_spec, |spec| SquareWave {
-                phase_inc: 440.0 / f64::try_from(spec.freq).unwrap_or(44100.0),
-                phase: 0.0,
+        let audio_device = audio_subsystem.open_playback(None, &desired_audio_spec, |spec| {
+            let freq = if spec.freq < 0 {
+                i64::from(-spec.freq)
+            } else {
+                i64::from(spec.freq)
+            };
+            let pitch = i64::from(self.options.pitch);
+            SquareWave {
+                channels: usize::from(spec.channels),
+                half_period: freq / (2 * pitch),
                 volume: 0.25,
-            })?;
+                index: 0,
+            }
+        })?;
 
-        // Create the event pump
+        // Screen colors as RBGA values
+        let fg = self.options.fg.to_be_bytes();
+        let bg = self.options.bg.to_be_bytes();
+
         let mut event_pump = sdl_context.event_pump()?;
-        let nano_seconds_per_frame: u128 = 1_000_000_000 / u128::from(self.options.fps);
-        
+        let nanos_per_frame: u128 =
+            Duration::from_secs(1).as_nanos() / u128::from(self.options.fps);
+
         'running: loop {
             let start = Instant::now();
             for _ in 0..self.options.ipf {
@@ -103,10 +118,7 @@ impl Emulator {
                     audio_device.pause();
                 }
                 if self.chip.fb.updated {
-                    let pixels = self
-                        .chip
-                        .fb
-                        .to_color_model(&[0xFF, 0xFF, 0xFF, 0xFF], &[0, 0, 0, 0]);
+                    let pixels = self.chip.fb.to_color_model(&fg, &bg);
                     texture.with_lock(None, |buffer: &mut [u8], _: usize| {
                         buffer.copy_from_slice(&pixels);
                     })?;
@@ -120,10 +132,10 @@ impl Emulator {
             canvas.copy(&texture, None, None)?;
             canvas.present();
 
-            let elapsed_nano_seconds = start.elapsed().as_nanos();
-            if elapsed_nano_seconds < nano_seconds_per_frame {
-                let sleep_duration = u64::try_from(nano_seconds_per_frame - elapsed_nano_seconds).unwrap_or(0);
-                std::thread::sleep(std::time::Duration::from_nanos(sleep_duration));
+            let elapsed_nanos = start.elapsed().as_nanos();
+            if elapsed_nanos < nanos_per_frame {
+                let sleep_duration = u64::try_from(nanos_per_frame - elapsed_nanos).unwrap_or(0);
+                std::thread::sleep(Duration::from_nanos(sleep_duration));
             }
         }
         Ok(())
@@ -131,22 +143,28 @@ impl Emulator {
 }
 
 struct SquareWave {
-    phase_inc: f64,
-    phase: f64,
+    channels: usize,
+    half_period: i64,
     volume: f32,
+    index: i64,
 }
 
 impl AudioCallback for SquareWave {
     type Channel = f32;
 
     fn callback(&mut self, out: &mut [Self::Channel]) {
-        for x in out.iter_mut() {
-            *x = if self.phase <= 0.5 {
-                self.volume
-            } else {
-                -self.volume
-            };
-            self.phase = (self.phase + self.phase_inc) % 1.0;
+        for x in out.chunks_mut(self.channels) {
+            if self.index / self.half_period >= 2 {
+                self.index = 0;
+            }
+            for i in 0..self.channels {
+                x[i] = if self.index / self.half_period == 0 {
+                    self.volume
+                } else {
+                    -self.volume
+                };
+            }
+            self.index += 1;
         }
     }
 }

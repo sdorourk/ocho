@@ -4,7 +4,7 @@ use crate::Instruction::*;
 use crate::{framebuffer::Framebuffer, instruction::Instruction};
 
 /// Memory size in bytes
-pub const MEMORY_SIZE: usize = 4096;
+const MEMORY_SIZE: usize = 4096;
 /// Program start address
 pub const PROGRAM_START: usize = 0x200;
 /// Display height in pixels
@@ -69,7 +69,7 @@ pub struct Chip8 {
 impl Chip8 {
     pub fn new(rom: &[u8]) -> Result<Self, String> {
         if rom.len() >= MEMORY_SIZE - PROGRAM_START {
-            return Result::Err("Program is too large to hold in CHIP-8 memory".into());
+            return Result::Err("program is too large to fit in memory".into());
         }
 
         let mut mem: [u8; MEMORY_SIZE] = [0; MEMORY_SIZE];
