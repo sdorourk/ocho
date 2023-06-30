@@ -22,7 +22,7 @@ pub struct Options {
     pub ipf: u16,
     /// Display scale factor
     pub scale: u32,
-    /// Foreground color (RBGA8888)
+    /// Foreground color (RGBA8888)
     pub fg: u32,
     /// Background color (RGBA8888)
     pub bg: u32,
@@ -44,15 +44,15 @@ impl Emulator {
         let audio_subsystem = sdl_context.audio()?;
 
         // Required to avoid excessive conversions
-        let height = DISPLAY_HEIGHT as u32;
-        let width = DISPLAY_WIDTH as u32;
+        const HEIGHT: u32 = DISPLAY_HEIGHT as u32;
+        const WIDTH: u32 = DISPLAY_WIDTH as u32;
 
         // Initialize the window
         let window = video_subsystem
             .window(
                 "CHIP-8 Emulator",
-                width * self.options.scale,
-                height * self.options.scale,
+                WIDTH * self.options.scale,
+                HEIGHT * self.options.scale,
             )
             .position_centered()
             .resizable()
@@ -62,10 +62,10 @@ impl Emulator {
         let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
         let texture_creator = canvas.texture_creator();
         canvas
-            .set_logical_size(width, height)
+            .set_logical_size(WIDTH, HEIGHT)
             .map_err(|e| e.to_string())?;
         let mut texture = texture_creator
-            .create_texture_streaming(PixelFormatEnum::RGBA32, width, height)
+            .create_texture_streaming(PixelFormatEnum::RGBA32, WIDTH, HEIGHT)
             .map_err(|e| e.to_string())?;
 
         // Initialize the audio
@@ -89,7 +89,7 @@ impl Emulator {
             }
         })?;
 
-        // Screen colors as RBGA values
+        // Screen colors as RGBA values
         let fg = self.options.fg.to_be_bytes();
         let bg = self.options.bg.to_be_bytes();
 
@@ -157,7 +157,7 @@ impl AudioCallback for SquareWave {
             if self.index / self.half_period >= 2 {
                 self.index = 0;
             }
-            for i in 0..self.channels {
+            for i in 0..x.len() {
                 x[i] = if self.index / self.half_period == 0 {
                     self.volume
                 } else {
