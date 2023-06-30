@@ -7,7 +7,7 @@ use sdl2::{
     pixels::PixelFormatEnum,
 };
 
-use crate::chip8::{Chip8, DISPLAY_HEIGHT, DISPLAY_WIDTH};
+use crate::chip8::{Chip8, Quirks, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 
 pub struct Emulator {
     chip: Chip8,
@@ -33,8 +33,8 @@ pub struct Options {
 }
 
 impl Emulator {
-    pub fn new(rom: &[u8], options: Options) -> Result<Self, String> {
-        let chip = Chip8::new(rom)?;
+    pub fn new(rom: &[u8], options: Options, quirks: Quirks) -> Result<Self, String> {
+        let chip = Chip8::new(rom, quirks)?;
         Ok(Self { chip, options })
     }
 

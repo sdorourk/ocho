@@ -64,10 +64,30 @@ pub struct Chip8 {
     sp: usize,
     /// Keypad
     pub keypad: [bool; KEYPAD_SIZE],
+    /// Quirks
+    quirks: Quirks,
+}
+
+/// CHIP-8 quirks and options
+#[derive(Debug)]
+pub struct Quirks {
+    /// The AND, OR, and XOR opcodes (0x8xy1, 0x8xy2, and 0x8xy3) reset the flags
+    /// register to zero
+    pub vf_reset: bool,
+    /// The save and load opcodes (0xFx55 and 0xFx65) increment the index register
+    pub memory: bool,
+    /// Sprites drawn to the screen wrap around instead of clip
+    pub wrap: bool,
+    /// The shift opcodes (0x8xy6 and 0x8xyE) operate on registers Vx and Vy, instead
+    /// of only Vx
+    pub shifting: bool,
+    /// The jump with offset opcode (0xBnnn) uses Vx instead of V0, where x is the
+    /// largest nibble of nnn
+    pub jumping: bool,
 }
 
 impl Chip8 {
-    pub fn new(rom: &[u8]) -> Result<Self, String> {
+    pub fn new(rom: &[u8], quirks: Quirks) -> Result<Self, String> {
         if rom.len() >= MEMORY_SIZE - PROGRAM_START {
             return Result::Err("program is too large to fit in memory".into());
         }
@@ -87,6 +107,7 @@ impl Chip8 {
             stack: [0; STACK_SIZE],
             sp: 0,
             keypad: [false; KEYPAD_SIZE],
+            quirks,
         })
     }
 
@@ -154,12 +175,21 @@ impl Chip8 {
             }
             Or(x, y) => {
                 self.v[x] |= self.v[y];
+                if self.quirks.vf_reset {
+                    self.v[0xF] = 0;
+                }
             }
             And(x, y) => {
                 self.v[x] &= self.v[y];
+                if self.quirks.vf_reset {
+                    self.v[0xF] = 0;
+                }
             }
             Xor(x, y) => {
                 self.v[x] ^= self.v[y];
+                if self.quirks.vf_reset {
+                    self.v[0xF] = 0;
+                }
             }
             Add(x, y) => {
                 let (value, overflow) = self.v[x].overflowing_add(self.v[y]);
@@ -179,9 +209,13 @@ impl Chip8 {
                     self.v[0xF] = 1;
                 }
             }
-            Shr(x, _) => {
-                self.v[0xF] = self.v[x] & 0x1;
+            Shr(x, y) => {
+                if self.quirks.shifting {
+                    self.v[x] = self.v[y]
+                }
+                let flag = self.v[x] & 0x1;
                 self.v[x] >>= 1;
+                self.v[0xF] = flag;
             }
             Subr(x, y) => {
                 let (value, overflow) = self.v[y].overflowing_sub(self.v[x]);
@@ -192,9 +226,13 @@ impl Chip8 {
                     self.v[0xF] = 1;
                 }
             }
-            Shl(x, _) => {
-                self.v[0xF] = (self.v[x] & 0b1000_0000) >> 7;
+            Shl(x, y) => {
+                if self.quirks.shifting {
+                    self.v[x] = self.v[y]
+                }
+                let flag = (self.v[x] & 0b1000_0000) >> 7;
                 self.v[x] <<= 1;
+                self.v[0xF] = flag;
             }
             Skne(x, y) => {
                 if self.v[x] != self.v[y] {
@@ -205,7 +243,12 @@ impl Chip8 {
                 self.i = nnn;
             }
             Jmpz(nnn) => {
-                self.pc = nnn + usize::from(self.v[0]);
+                if self.quirks.jumping {
+                    let x = nnn >> 8;
+                    self.pc = nnn + usize::from(self.v[x]);
+                } else {
+                    self.pc = nnn + usize::from(self.v[0]);
+                }
             }
             Rnd(x, nn) => {
                 self.v[x] = rand::thread_rng().gen::<u8>() & nn;
@@ -216,7 +259,7 @@ impl Chip8 {
                     self.v[y],
                     n,
                     &self.mem[self.i..self.i + usize::from(n)],
-                    false,
+                    self.quirks.wrap,
                 ) {
                     self.v[0xF] = 1;
                 } else {
@@ -294,6 +337,9 @@ impl Chip8 {
                 for offset in 0..=x {
                     self.mem[self.i + offset] = self.v[offset];
                 }
+                if self.quirks.memory {
+                    self.i += x + 1;
+                }
             }
             Lreg(x) => {
                 assert!(
@@ -302,6 +348,9 @@ impl Chip8 {
                 );
                 for offset in 0..=x {
                     self.v[offset] = self.mem[self.i + offset];
+                }
+                if self.quirks.memory {
+                    self.i += x + 1;
                 }
             }
             Err(_) => {}

@@ -10,7 +10,7 @@ mod emulator;
 mod framebuffer;
 mod instruction;
 
-use chip8::PROGRAM_START;
+use chip8::{Quirks, PROGRAM_START};
 use clap::{value_parser, Parser};
 use emulator::{Emulator, Options};
 use instruction::Instruction;
@@ -46,6 +46,21 @@ struct Cli {
     /// Limit only one draw operation per frame
     #[arg(short, long)]
     display_wait: bool,
+    /// Bitwise operations reset the flags register
+    #[arg(long)]
+    quirk_vf_reset: bool,
+    /// Save and load instructions increment the index register
+    #[arg(long)]
+    quirk_memory: bool,
+    /// Sprites drawn to the screen wrap, instead of clip
+    #[arg(long)]
+    quirk_wrap: bool,
+    /// Bitwise shifting operations use two registers, instead of only one
+    #[arg(long)]
+    quirk_shift: bool,
+    /// Jump with offset instruction uses specified register, instead of V0
+    #[arg(long)]
+    quirk_jump: bool,
 }
 
 fn main() {
@@ -89,7 +104,14 @@ fn main() {
         pitch: cli.pitch,
         display_wait: cli.display_wait,
     };
-    let mut emu = match Emulator::new(&rom, options) {
+    let quirks = Quirks {
+        vf_reset: cli.quirk_vf_reset,
+        memory: cli.quirk_memory,
+        wrap: cli.quirk_wrap,
+        shifting: cli.quirk_shift,
+        jumping: cli.quirk_jump,
+    };
+    let mut emu = match Emulator::new(&rom, options, quirks) {
         Ok(emu) => emu,
         Err(e) => {
             eprintln!(
