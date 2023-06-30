@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use sdl2::{
     audio::{AudioCallback, AudioSpecDesired},
     event::Event,
-    keyboard::Keycode,
+    keyboard::{Keycode, Scancode},
     pixels::PixelFormatEnum,
 };
 
@@ -107,6 +107,22 @@ impl Emulator {
                             keycode: Some(Keycode::Escape),
                             ..
                         } => break 'running,
+                        Event::KeyDown {
+                            scancode: Some(scancode),
+                            ..
+                        } => {
+                            if let Some(key) = self.keymap(scancode) {
+                                self.chip.keypad[key] = true;
+                            }
+                        }
+                        Event::KeyUp {
+                            scancode: Some(scancode),
+                            ..
+                        } => {
+                            if let Some(key) = self.keymap(scancode) {
+                                self.chip.keypad[key] = false;
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -132,6 +148,13 @@ impl Emulator {
             canvas.copy(&texture, None, None)?;
             canvas.present();
 
+            if self.chip.st > 0 {
+                self.chip.st -= 1;
+            }
+            if self.chip.dt > 0 {
+                self.chip.dt -= 1;
+            }
+
             let elapsed_nanos = start.elapsed().as_nanos();
             if elapsed_nanos < nanos_per_frame {
                 let sleep_duration = u64::try_from(nanos_per_frame - elapsed_nanos).unwrap_or(0);
@@ -139,6 +162,28 @@ impl Emulator {
             }
         }
         Ok(())
+    }
+
+    fn keymap(&self, scancode: Scancode) -> Option<usize> {
+        match scancode {
+            Scancode::Num1 => Some(0x1),
+            Scancode::Num2 => Some(0x2),
+            Scancode::Num3 => Some(0x3),
+            Scancode::Num4 => Some(0xC),
+            Scancode::Q => Some(0x4),
+            Scancode::W => Some(0x5),
+            Scancode::E => Some(0x6),
+            Scancode::R => Some(0xD),
+            Scancode::A => Some(0x7),
+            Scancode::S => Some(0x8),
+            Scancode::D => Some(0x9),
+            Scancode::F => Some(0xE),
+            Scancode::Z => Some(0xA),
+            Scancode::X => Some(0x0),
+            Scancode::C => Some(0xB),
+            Scancode::V => Some(0xF),
+            _ => None,
+        }
     }
 }
 
