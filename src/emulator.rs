@@ -164,7 +164,7 @@ impl Emulator {
         Ok(())
     }
 
-    fn keymap(&self, scancode: Scancode) -> Option<usize> {
+    fn keymap(&self, scancode: Scancode) -> Option<u8> {
         match scancode {
             Scancode::Num1 => Some(0x1),
             Scancode::Num2 => Some(0x2),

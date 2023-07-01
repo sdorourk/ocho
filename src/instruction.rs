@@ -66,7 +66,7 @@ pub enum Instruction {
     Sknp(usize),
     /// Fx07 - LDDT Vx.  Set Vx to the value of the delay timer.  
     Ldft(usize),
-    /// Fx0A - LDK Vx.  Wait for a key press and store the value of the key in Vx.
+    /// Fx0A - LDK Vx.  Wait for a key release and store the value of the key in Vx.
     Ldk(usize),
     /// Fx15 - LDDT Vx.  Set the delay timer to Vx.  
     Lddt(usize),

@@ -113,10 +113,9 @@ impl Chip8 {
         })
     }
 
+    /// Fetch, decode, and execute the next instruction
     pub fn step(&mut self) {
-        // Fetch and decode
         let instr = Instruction::from(self.fetch());
-        // Execute the instruction
         self.execute(instr);
     }
 
@@ -269,15 +268,13 @@ impl Chip8 {
                 }
             }
             Skp(x) => {
-                let key = usize::from(self.v[x]);
-                assert!(key < KEYPAD_SIZE, "{:#X} is not a valid key", key);
+                let key = self.v[x];
                 if self.keypad[key] {
                     self.pc += 2;
                 }
             }
             Sknp(x) => {
-                let key = usize::from(self.v[x]);
-                assert!(key < KEYPAD_SIZE, "{:#X} is not a valid key", key);
+                let key = self.v[x];
                 if !self.keypad[key] {
                     self.pc += 2;
                 }
@@ -357,15 +354,20 @@ impl Chip8 {
 
 #[derive(Debug)]
 pub struct Keypad {
+    /// Track which keys are pressed
     keys: [bool; KEYPAD_SIZE],
+    /// Set to `true` when executing the "wait for key release" instruction (opcode 0xFx0A)
     wait: bool,
+    /// The value of the key that was finally released while executing the "wait for key 
+    /// release" instruction (opcode 0xFx0A)
     key_released: Option<u8>,
 }
 
-impl Index<usize> for Keypad {
+impl Index<u8> for Keypad {
     type Output = bool;
 
-    fn index(&self, index: usize) -> &Self::Output {
+    fn index(&self, index: u8) -> &Self::Output {
+        let index = usize::from(index);
         assert!(index < KEYPAD_SIZE, "{:#X} is not a valid key", index);
         &self.keys[index]
     }
@@ -380,12 +382,14 @@ impl Keypad {
         }
     }
 
-    pub fn key_pressed(&mut self, key: usize) {
+    pub fn key_pressed(&mut self, key: u8) {
+        let key = usize::from(key);
         assert!(key < KEYPAD_SIZE, "{:#X} is not a valid key", key);
         self.keys[key] = true;
     }
 
-    pub fn key_released(&mut self, key: usize) {
+    pub fn key_released(&mut self, key: u8) {
+        let key = usize::from(key);
         assert!(key < KEYPAD_SIZE, "{:#X} is not a valid key", key);
         self.keys[key] = false;
         if self.wait {
