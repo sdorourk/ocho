@@ -28,7 +28,7 @@ impl Framebuffer {
         self.updated = true;
     }
 
-    /// Draws a sprite at `(x,y)` that has a width of 8 pixels and height of `n` pixels.
+    /// Draw a sprite at `(x,y)` that has a width of 8 pixels and height of `n` pixels.
     /// `sprite` contains the sprite data.  Sprites drawn at the edge of the screen will be
     /// clipped if `wrap` is false; otherwise, sprites will get drawn at the right coordinates
     /// on the other side of the screen.  Returns true if any pixels are flipped from set
@@ -58,7 +58,7 @@ impl Framebuffer {
         ret
     }
 
-    /// Convert the framebuffer into a color model (e.g., RGB888 or ARGB8888).  A set
+    /// Convert the framebuffer into a color model (e.g., RGB888 or RGBA8888).  A set
     /// pixel is represented by `fg` and an unset pixel is represented by `bg`.
     pub fn to_color_model<T>(&self, fg: &[T], bg: &[T]) -> Vec<T>
     where

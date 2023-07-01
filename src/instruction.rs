@@ -4,7 +4,7 @@ use Instruction::*;
 /// Chip-8 instruction set.
 ///
 /// Doc-comments use the following variables:
-///  - nnn - a 12-bit value, the lowester 12 bits of the instruction
+///  - nnn - a 12-bit value, the lowest 12 bits of the instruction
 ///  - n - a 4-bit value, the lowest 4 bits of the instruction
 ///  - x - a 4-bit value, the lower 4 bits of the high byte of the instruction
 ///  - y - a 4-bit value, the upper 4 bits of the low byte of the instruction
@@ -93,9 +93,9 @@ impl From<u16> for Instruction {
         let i = (value & 0xF000) >> 12;
         let x = usize::from((value & 0x0F00) >> 8);
         let y = usize::from((value & 0x00F0) >> 4);
-        let n = u8::try_from(value & 0x000F).unwrap();
+        let n = (value & 0x000F) as u8;
         let nnn = usize::from(value & 0x0FFF);
-        let nn = u8::try_from(value & 0x00FF).unwrap();
+        let nn = (value & 0x00FF) as u8;
 
         match i {
             0 => match nnn {

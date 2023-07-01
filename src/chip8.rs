@@ -70,7 +70,7 @@ pub struct Chip8 {
     quirks: Quirks,
 }
 
-/// CHIP-8 quirks and options
+/// CHIP-8 implementation quirks
 #[derive(Debug)]
 pub struct Quirks {
     /// The AND, OR, and XOR opcodes (0x8xy1, 0x8xy2, and 0x8xy3) reset the flags
@@ -78,7 +78,7 @@ pub struct Quirks {
     pub vf_reset: bool,
     /// The save and load opcodes (0xFx55 and 0xFx65) increment the index register
     pub memory: bool,
-    /// Sprites drawn to the screen wrap around instead of clip
+    /// Sprites drawn to the screen wrap around, instead of clip
     pub wrap: bool,
     /// The shift opcodes (0x8xy6 and 0x8xyE) operate on registers Vx and Vy, instead
     /// of only Vx
@@ -358,7 +358,7 @@ pub struct Keypad {
     keys: [bool; KEYPAD_SIZE],
     /// Set to `true` when executing the "wait for key release" instruction (opcode 0xFx0A)
     wait: bool,
-    /// The value of the key that was finally released while executing the "wait for key 
+    /// The value of the key that was finally released while executing the "wait for key
     /// release" instruction (opcode 0xFx0A)
     key_released: Option<u8>,
 }
@@ -388,12 +388,12 @@ impl Keypad {
         self.keys[key] = true;
     }
 
-    pub fn key_released(&mut self, key: u8) {
-        let key = usize::from(key);
+    pub fn key_released(&mut self, key_released: u8) {
+        let key = usize::from(key_released);
         assert!(key < KEYPAD_SIZE, "{:#X} is not a valid key", key);
         self.keys[key] = false;
         if self.wait {
-            self.key_released = Some(key as u8);
+            self.key_released = Some(key_released);
         }
     }
 }

@@ -20,7 +20,7 @@ pub struct Options {
     pub fps: u16,
     /// Instructions executed per frame
     pub ipf: u16,
-    /// Display scale factor
+    /// Window scale factor
     pub scale: u32,
     /// Foreground color (RGBA8888)
     pub fg: u32,
@@ -89,7 +89,7 @@ impl Emulator {
             }
         })?;
 
-        // Screen colors as RGBA values
+        // Colors as RGBA values
         let fg = self.options.fg.to_be_bytes();
         let bg = self.options.bg.to_be_bytes();
 
@@ -202,8 +202,8 @@ impl AudioCallback for SquareWave {
             if self.index / self.half_period >= 2 {
                 self.index = 0;
             }
-            for i in 0..x.len() {
-                x[i] = if self.index / self.half_period == 0 {
+            for vol in x {
+                *vol = if self.index / self.half_period == 0 {
                     self.volume
                 } else {
                     -self.volume

@@ -1,10 +1,3 @@
-/////////////////////////////////////////////////////////
-/// Todo:
-///  - Add quirks
-///  - Keypad support
-///  - Document
-///  - Check for errors and test
-/////////////////////////////////////////////////////////
 mod chip8;
 mod emulator;
 mod framebuffer;
@@ -16,13 +9,13 @@ use emulator::{Emulator, Options};
 use instruction::Instruction;
 use std::{fs::read, path::PathBuf};
 
+/// A simple CHIP-8 emulator and disassembler
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about)]
 struct Cli {
-    /// Path to the binary CHIP-8 program to run
+    /// Path to the binary CHIP-8 program
     program: PathBuf,
-    /// Display the disassembled binary CHIP-8 program to standard output before running it.  
-    /// This is useful for debugging.
+    /// Display disassembly code before running the binary CHIP-8 program
     #[arg(long)]
     disasm: bool,
     /// Target frames per second
@@ -43,7 +36,7 @@ struct Cli {
     /// Pitch of the buzzer (in Hz)
     #[arg(short, long, default_value_t = 440, value_parser = value_parser!(u16).range(20..=10_000))]
     pitch: u16,
-    /// Limit only one draw operation per frame
+    /// Limit one draw operation per frame
     #[arg(short, long)]
     display_wait: bool,
     /// Bitwise operations reset the flags register
@@ -90,10 +83,10 @@ fn main() {
         disassemble(&rom);
     }
 
-    // Clap has already checked that `parse_color` will not return `Err` for these values,
-    // so it is safe to unwrap; there is no possibility of panicking.
-    let fg = parse_color(&cli.color).unwrap();
-    let bg = parse_color(&cli.background).unwrap();
+    // Clap has already checked that `parse_color` will not return `Err` for these values;
+    // there is no possibility of panicking.
+    let fg = parse_color(&cli.color).expect("Verified by clap");
+    let bg = parse_color(&cli.background).expect("Verified by clap");
 
     let options = Options {
         fps: cli.fps,
@@ -145,7 +138,8 @@ fn disassemble(rom: &[u8]) {
     }
 }
 
-/// Verifies if the function `parse_color` will succeed
+/// Verifies if the function `parse_color` will succeed.  This is used by
+/// `clap::value_parser`.
 fn verify_color(s: &str) -> Result<String, String> {
     parse_color(s)?;
     Ok(String::from(s))
