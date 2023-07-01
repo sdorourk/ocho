@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use rand::Rng;
 
 use crate::Instruction::*;
@@ -63,7 +65,7 @@ pub struct Chip8 {
     /// Stack pointer
     sp: usize,
     /// Keypad
-    pub keypad: [bool; KEYPAD_SIZE],
+    pub keypad: Keypad,
     /// Quirks
     quirks: Quirks,
 }
@@ -106,7 +108,7 @@ impl Chip8 {
             st: 0,
             stack: [0; STACK_SIZE],
             sp: 0,
-            keypad: [false; KEYPAD_SIZE],
+            keypad: Keypad::new(),
             quirks,
         })
     }
@@ -284,22 +286,17 @@ impl Chip8 {
                 self.v[x] = self.dt;
             }
             Ldk(x) => {
-                let pressed_keys: Vec<u8> = self
-                    .keypad
-                    .into_iter()
-                    .enumerate()
-                    .filter_map(|(i, val)| {
-                        if val {
-                            Some(u8::try_from(i).unwrap())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                if pressed_keys.is_empty() {
-                    self.pc -= 2;
+                if self.keypad.wait {
+                    if let Some(key) = self.keypad.key_released {
+                        self.v[x] = key;
+                        self.keypad.wait = false;
+                        self.keypad.key_released = None;
+                    } else {
+                        self.pc -= 2;
+                    }
                 } else {
-                    self.v[x] = pressed_keys[0];
+                    self.keypad.wait = true;
+                    self.pc -= 2;
                 }
             }
             Lddt(x) => {
@@ -354,6 +351,45 @@ impl Chip8 {
                 }
             }
             Err(_) => {}
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Keypad {
+    keys: [bool; KEYPAD_SIZE],
+    wait: bool,
+    key_released: Option<u8>,
+}
+
+impl Index<usize> for Keypad {
+    type Output = bool;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        assert!(index < KEYPAD_SIZE, "{:#X} is not a valid key", index);
+        &self.keys[index]
+    }
+}
+
+impl Keypad {
+    pub const fn new() -> Self {
+        Self {
+            keys: [false; KEYPAD_SIZE],
+            wait: false,
+            key_released: None,
+        }
+    }
+
+    pub fn key_pressed(&mut self, key: usize) {
+        assert!(key < KEYPAD_SIZE, "{:#X} is not a valid key", key);
+        self.keys[key] = true;
+    }
+
+    pub fn key_released(&mut self, key: usize) {
+        assert!(key < KEYPAD_SIZE, "{:#X} is not a valid key", key);
+        self.keys[key] = false;
+        if self.wait {
+            self.key_released = Some(key as u8);
         }
     }
 }

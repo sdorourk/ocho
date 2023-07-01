@@ -112,7 +112,7 @@ impl Emulator {
                             ..
                         } => {
                             if let Some(key) = self.keymap(scancode) {
-                                self.chip.keypad[key] = true;
+                                self.chip.keypad.key_pressed(key);
                             }
                         }
                         Event::KeyUp {
@@ -120,7 +120,7 @@ impl Emulator {
                             ..
                         } => {
                             if let Some(key) = self.keymap(scancode) {
-                                self.chip.keypad[key] = false;
+                                self.chip.keypad.key_released(key);
                             }
                         }
                         _ => {}
