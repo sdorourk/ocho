@@ -7,7 +7,7 @@ This is a hobby project made with the intention of learning more about Rust and 
 ![Screenshot 2](/screenshots/screenshot2.png)
 
 ## Command line interface
-Modern CHIP-8 interpreters often behave slightly different than the original COSMAC VIP version.  This emulator defaults to modern behaviors whenever possible. However, you can control this behavior using the command line interface. 
+Modern CHIP-8 interpreters often behave slightly different than the original COSMAC VIP version.  This emulator defaults to modern behaviors whenever possible. However, you can control these behaviors using the command line interface. 
 ```
 Usage: ocho [OPTIONS] <PROGRAM>
 
