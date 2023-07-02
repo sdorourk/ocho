@@ -3,6 +3,9 @@ A simple CHIP-8 emulator and disassembler written in Rust. Uses [SDL](https://ww
 
 This is a hobby project made with the intention of learning more about Rust and emulation. 
 
+![Screenshot 1](/screenshots/screenshot1.png)
+![Screenshot 2](/screenshots/screenshot2.png)
+
 ## Command line interface
 Modern CHIP-8 interpreters often behave slightly different than the original COSMAC VIP version.  This emulator attempts to use modern default behaviors whenever possible. However, you can control this behavior using the command line interface. 
 ```
@@ -30,7 +33,7 @@ Options:
 ```
 
 ## Keypad
-At any time you can press *Esc* to close the emulator. The CHIP-8 featured a hexadecimal keypad with keys labelled `0` through `F`. These keys are mapped using the left-hand side of the keyboard:
+At any time you can press *Esc* to close the emulator. The earliest computers that CHIP-8 interpreters ran on featured a hexadecimal keypad with keys labelled `0` through `F`. In the emulator, these keys are mapped using the left-hand side of the keyboard:
 ```
 Keyboard   CHIP-8 Keypad
 1 2 3 4      1 2 3 C
@@ -40,16 +43,19 @@ Z X C V      A 0 B F
 ```
 
 ## Status
-Passes all of [Timendus' tests](https://github.com/Timendus/chip8-test-suite). In order to pass the [quirk's test](https://github.com/Timendus/chip8-test-suite#quirks-test), you must enable the quirks from the [command line interface](#command-line-interface):
+Passes all of [Timendus' tests](https://github.com/Timendus/chip8-test-suite). In order to pass the [quirks test](https://github.com/Timendus/chip8-test-suite#quirks-test), you must enable the quirks from the [command line interface](#command-line-interface):
 ```
 cargo run --release -- 5-quirks.ch8 --quirk-vf-reset --quirk-memory -d --quirk-shift
 ```
+![Timendus' test screenshot](/screenshots/screenshot3.png)
+
 Sound, timers, and random number generation can be tested using [Matthew Mikolay's tests](https://github.com/mattmikolay/chip-8). In particular, see the [heart monitor demo](https://github.com/mattmikolay/chip-8/tree/master/heartmonitor), [morse code demo](https://github.com/mattmikolay/chip-8/tree/master/morsecode), [delay timer test](https://github.com/mattmikolay/chip-8/tree/master/delaytimer), and [random number test](https://github.com/mattmikolay/chip-8/tree/master/randomnumber). 
 
 ## References
  - [https://en.wikipedia.org/wiki/CHIP-8](https://en.wikipedia.org/wiki/CHIP-8)
  - [https://tobiasvl.github.io/blog/write-a-chip-8-emulator/](https://tobiasvl.github.io/blog/write-a-chip-8-emulator/)
- - [https://github.com/Timendus/chip8-test-suite#quirks-test](https://github.com/Timendus/chip8-test-suite#quirks-test)
+ - [https://github.com/Timendus/chip8-test-suite](https://github.com/Timendus/chip8-test-suite)
  - [https://chip8.gulrak.net/](https://chip8.gulrak.net/)
  - [http://devernay.free.fr/hacks/chip8/C8TECH10.HTM](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM)
  - [https://chip-8.github.io/database/](https://chip-8.github.io/database/)
+ - [https://retrocomputing.stackexchange.com/a/361](https://retrocomputing.stackexchange.com/a/361)
